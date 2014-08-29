@@ -1,0 +1,8 @@
+{
+  "name": "invertd",
+  "version": "0.0.1",
+  "description": "TD inverted",
+  "dependencies": {
+    "express": "^4.3.1"
+  }
+}

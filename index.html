@@ -1,0 +1,287 @@
+<html>
+<head>
+  <title>Invertd</title>
+  <style type="text/css">
+  #canvas {
+    border-top: 1px solid black;
+    border-left: 1px solid black;
+    border-bottom: 2px solid black;
+    border-right: 2px solid black;
+    width: 525px;
+    height: 525px;
+    margin: 50px auto;
+  }
+
+  .cell {
+    width: 25px;
+    height: 25px;
+    float: left;
+    border-top: 1px solid black;
+    border-left: 1px solid black;
+    box-sizing: border-box;
+  }
+
+  .tower {
+    background-color: red
+  }
+
+  .road {
+    background-color: yellow
+  }
+
+  #units {
+    position: absolute;
+    width: 525px;
+    height: 525px;
+    pointer-events: none;
+  }
+
+  .kryl {
+    position: absolute;
+    width: 5px;
+    height: 5px;
+    border-radius: 5px;
+    background-color: purple;
+  }
+
+  .krei {
+    position: absolute;
+    width: 5px;
+    height: 5px;
+    border-radius: 5px;
+    background-color: black;
+  }
+  </style>
+</head>
+<body>
+  <button id="road" onclick="toggleroad()">validate road</button><button id="start" style="visibility: hidden" onclick="tick()">go</button><br>
+  army (0 = kryl, 1 = krei; separate with ,) <input type="text" id="army" /> <button onclick="validatearmy()">validate army</button>
+  <div id="budget"></div>
+
+  <div id="canvas">
+    <div id="units"></div>
+  </div>
+
+  
+
+  <script type="text/javascript">
+    var canvas = document.getElementById('canvas')
+      , roadbuilding = true
+      , budget = 4000
+      , towers = [
+        new Tower(4, 3),
+        new Tower(4, 9),
+        new Tower(10, 7),
+        new Tower(10, 13),
+        new Tower(16, 11),
+        new Tower(16, 17)
+      ]
+      , start = [10, 0]
+      , road = []
+      , path = []
+      , cells = []
+      , units = []
+      , tickID
+  
+
+    function init () {
+      updateBudget()
+
+      for (var i = 0; i < 21; i++) {
+        cells[i] = []
+        for (var j = 0; j < 21; j++) {
+          var cell = document.createElement('div')
+          cell.className = 'cell'
+          cell.dataset.x = i
+          cell.dataset.y = j
+          cell.addEventListener('click', clickCell, false)
+          cells[i][j] = cell
+          canvas.appendChild(cell)
+        }
+      }
+
+      for (var i = 0; i < towers.length; i++) {
+        makeTower(towers[i].x, towers[i].y)
+      }
+
+    }
+
+    function tick() {
+      for (var i = 0; i < towers.length; i++) {
+        towers[i].hasfired = false
+      }
+
+      console.log(units[0].position)
+
+      for (var i = 0; i < units.length; i++) {
+        var unit = units[i]
+        if (!unit.dead) {
+          updateHP(unit)
+          unit.position++
+        }
+      }
+
+      draw()
+      tickID = window.setTimeout(tick, 500)
+    }
+
+    function draw () {
+      for (var i = 0; i < units.length; i++) {
+        if (units[i].position > -1 && units[i].position < road.length) {
+          units[i].el.style.top = road[units[i].position][0] * 25 + 10
+          units[i].el.style.left = road[units[i].position][1] * 25 + 10
+          units[i].el.textContent = units[i].hp
+        } else if (units[i].position >= road.length) {
+          units[i].el.style.visibility = 'hidden'
+        }
+      }
+    }
+
+    function makeTower (x, y) {
+      cells[x][y].className += ' tower'
+    }
+
+    function updateHP (unit) {
+
+      for (var i = 0; i < towers.length; i++) {
+        if (unit.position > 0 && unit.position < road.length && Math.abs(road[unit.position][0] - towers[i].x) < 3 && Math.abs(road[unit.position][1] - towers[i].y) < 3 && !towers[i].hasfired) {
+          unit.hp -= 10
+          towers[i].hasfired = true
+        }
+      }
+
+      if (unit.hp <= 0) {
+        unit.die()
+      }
+    }
+
+    function Unit (order) {
+      this.position = (-1 * order * 2) - 1
+      this.dead = false
+      
+      this.el = document.createElement('div')
+      document.getElementById('units').appendChild(this.el)
+
+      this.die = function () {
+        document.getElementById('units').removeChild(this.el)
+        this.dead = true
+      }
+    }
+
+    function Kryl (order) {
+      Unit.apply(this, arguments)
+
+      this.hp = 25
+      this.cost = 200
+
+      this.el.className = 'kryl'
+    }
+
+    function Krei (order) {
+      Unit.apply(this, arguments)
+
+      this.hp = 50
+      this.cost = 300
+
+      this.el.className = 'krei'
+    }
+
+    function Tower (x, y) {
+      this.x = x
+      this.y = y
+
+      this.damage = 10
+
+      this.hasfired = false
+    }
+
+    init()
+
+
+    function toggleroad () {
+      roadbuilding = !roadbuilding
+      document.getElementById('road').textContent = roadbuilding ? 'validate road' : 'edit road'
+      if (!roadbuilding)
+        checkroad()
+    }
+
+    function checkroad () {
+      var arr = path.map(function(el) {return [parseInt(el.dataset.x), parseInt(el.dataset.y)]})
+
+      var ordArr = []
+
+      for (var i = 0; i < arr.length; i++) {
+        if (arr[i][0] == start[0] && arr[i][1] == start[1]) {
+          var arr0 = arr[0]
+          arr[0] = arr[i]
+          arr[i] = arr0
+        }
+      }
+
+      for (var i=1; i < arr.length; i++) {
+        var arr0 = arr[i]
+          , k
+        for (var j=1; j<arr.length; j++) {
+          if(Math.abs(arr[i-1][0] - arr[j][0]) + Math.abs(arr[i-1][1] - arr[j][1]) == 1)
+            k = j
+        }
+
+        arr[i] = arr[k]
+        arr[k] = arr0
+      }
+
+      road = arr
+
+      if (road.length > 0)
+        document.getElementById('start').style.visibility = 'visible'
+    }
+
+    function clickCell () {
+      if (roadbuilding)
+        toggleCell(this)
+    }
+
+    function toggleCell (cell) {
+      if(cell.className.indexOf('tower') > -1)
+        return
+
+      if(cell.className.indexOf('road') > -1) {
+        budget += 100
+        cell.className = cell.className.replace( / road/ , '' )
+        path.splice(path.indexOf(cell), 1)
+      } else {
+        if (budget >= 100) {
+          budget -= 100
+          cell.className += ' road'
+          path.push(cell)
+        }
+      }
+
+      updateBudget()
+    }
+
+    function validatearmy () {
+      for (var i=0; i < units.length; i++) {
+        budget += units[i].cost
+      }
+
+      units = []
+
+      var army = eval('['+document.getElementById('army').value+']')
+      
+      for (var i=0; i < army.length; i++) {
+        var unit = (army[i] == 0) ? new Kryl(i) : new Krei(i)
+        units.push(unit)
+        budget -= unit.cost
+      }
+
+      updateBudget()
+    }
+
+    function updateBudget () {
+      document.getElementById('budget').textContent = 'Flouze : ' + budget
+    }
+
+  </script>
+</body>
+</html>
