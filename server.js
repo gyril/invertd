@@ -6,6 +6,10 @@ app.get('/', function(req, res){
   res.sendfile('index.html')
 })
 
+app.get('/canvas', function(req, res) {
+  res.sendfile('canvas.html')
+})
+
 http.listen(port, function(){
   console.log('listening on *:'+port)
 })
