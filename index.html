@@ -54,7 +54,7 @@
   </style>
 </head>
 <body>
-  <button id="road" onclick="toggleroad()">validate road</button><button id="start" style="visibility: hidden" onclick="tick()">go</button><br>
+  <button id="road" onclick="toggleroad()">validate road</button><button id="start" onclick="tick()">go</button><br>
   army (0 = kryl, 1 = krei; separate with ,) <input type="text" id="army" /> <button onclick="validatearmy()">validate army</button>
   <div id="budget"></div>
 
@@ -69,16 +69,14 @@
       , roadbuilding = true
       , budget = 4000
       , towers = [
-        new Tower(4, 3),
-        new Tower(4, 9),
-        new Tower(10, 7),
-        new Tower(10, 13),
-        new Tower(16, 11),
-        new Tower(16, 17)
+        new Tower(8, 3),
+        new Tower(8, 11),
+        new Tower(12, 9),
+        new Tower(12, 17)
       ]
       , start = [10, 0]
       , end = [10, 20]
-      , road = []
+      , road = [[10,0],[10,1],[10,2],[10,3],[10,4],[10,5],[10,6],[10,7],[10,8],[10,9],[10,10],[10,11],[10,12],[10,13],[10,14],[10,15],[10,16],[10,17],[10,18],[10,19],[10,20]]
       , path = []
       , cells = []
       , units = []
@@ -95,7 +93,7 @@
           cell.className = 'cell'
           cell.dataset.x = i
           cell.dataset.y = j
-          cell.addEventListener('mouseenter', enterCell, false)
+          //cell.addEventListener('mouseenter', enterCell, false)
           cells[i][j] = cell
           canvas.appendChild(cell)
         }
@@ -109,6 +107,9 @@
       endCell.className += ' road end'
       path.push(endCell)
       
+      for (var i = 0; i < road.length; i++) {
+        cells[road[i][0]][road[i][1]].className += ' road'
+      }
 
       for (var i = 0; i < towers.length; i++) {
         makeTower(towers[i].x, towers[i].y)
@@ -243,9 +244,6 @@
       }
 
       road = arr
-
-      if (road.length > 0)
-        document.getElementById('start').style.visibility = 'visible'
     }
 
     function enterCell () {

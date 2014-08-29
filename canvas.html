@@ -1,0 +1,286 @@
+<html>
+<head>
+  <title>Invertd</title>
+  <style type="text/css">
+  #board {
+    box-shadow: 0 0 0 2px black;
+    position: absolute;
+    top: 50px;
+    left: 50px;
+  }
+
+  #canvas {
+    position: absolute;
+    top: 50px;
+    left: 50px;
+  }
+
+  </style>
+</head>
+<body>
+  <button onclick="towerPlacement()">tower placement</button>
+  <button onclick="originalPathing()">draw original path</button>
+  <button onclick="selectArmy()">select army</button>
+  <button>play</button>
+  <button onclick="reset()">reset</button>
+  <br>
+  <canvas id="board">
+  </canvas>
+  <canvas id="canvas">
+  </canvas>
+
+  
+
+  <script type="text/javascript">  
+    var board = document.getElementById('board')
+      , canvas = document.getElementById('canvas')
+      , boardContext = board.getContext('2d')
+      , context = canvas.getContext('2d')
+      , cellSize = 40
+      , phase = 'blank'
+      , drag = false
+      , mousedown = false
+      , currentCell = [-1, -1]
+
+    //canvas.addEventListener('click', clickCanvas, false)
+    canvas.addEventListener('mousedown', mouseDown, false)
+    canvas.addEventListener('mouseup', mouseUp, false)
+    canvas.addEventListener('mousemove', mouseMove, false)
+
+    var sizeString = window.prompt('map size (WxH)')
+      , gridWidth = parseInt(sizeString.split('x')[0])
+      , gridHeight = parseInt(sizeString.split('x')[1])
+      , width = gridWidth * cellSize
+      , height = gridHeight * cellSize
+
+    var towers = []
+      , army = []
+      , path = []
+
+    board.width = width
+    board.height = height
+    board.style.width = width + 'px'
+    board.style.height = height + 'px'
+    canvas.width = width
+    canvas.height = height
+    canvas.style.width = width + 'px'
+    canvas.style.height = height + 'px'
+
+    drawCells()
+
+    // Inputs 
+
+    function clickCanvas (e) {
+      var cellClicked = returnCell(e)
+      click(cellClicked)
+    }
+
+    function mouseDown (e) {
+      mousedown = true
+    }
+
+    function mouseUp (e) {
+      mousedown = false
+      if (drag)
+        drag = false
+      else clickCanvas(e)
+    }
+
+    function mouseMove (e) {
+      if (!mousedown)
+        return
+
+      drag = true
+
+      var previousCell = currentCell
+      currentCell = returnCell(e)
+
+      if (currentCell[0] != previousCell[0] || currentCell[1] != previousCell[1]) {
+        clickCanvas(e)
+      }
+        
+    }
+
+    function click (cell) {
+      switch (phase) {
+        case 'towerPlacement':
+          toggleTower(cell)
+          break;
+        case 'originalPathing':
+          togglePath(cell)
+          break;
+        case 'editPathing':
+          break;
+        default:
+          break;
+      }
+    }
+
+    function returnCell (e) {
+      return [Math.floor(e.offsetX/cellSize), Math.floor(e.offsetY/cellSize)]
+    }
+
+    // init
+
+    function drawCells () {
+      for (var i=1; i < gridWidth; i++) {
+        boardContext.beginPath()
+        boardContext.moveTo(i*cellSize, 0)
+        boardContext.lineTo(i*cellSize, height)
+        boardContext.stroke()
+      }
+
+      for (var i=1; i < gridHeight; i++) {
+        boardContext.beginPath()
+        boardContext.moveTo(0, i*cellSize)
+        boardContext.lineTo(width, i*cellSize)
+        boardContext.stroke()
+      }
+    }
+
+    function reset () {
+      towers = []
+      path = []
+
+      draw()
+    }
+
+    function toggleTower (cell) {
+      var _cell = cellType(cell)
+
+      if (_cell.type == 'blank') {
+        towers.push(new Tower(cell))
+      } else if (_cell.type == 'tower') {
+        towers.splice(_cell.index, 1)
+      } else {
+        // should not happen
+      }
+
+      draw()
+    }
+
+    function togglePath (cell) {
+      var _cell = cellType(cell)
+
+      if (_cell.type == 'blank') {
+        path.push(new Pathpoint(cell))
+      } else if (_cell.type == 'path') {
+        path.splice(_cell.index, 1)
+      } else {
+        // clicked tower: do nothing
+      }
+
+      draw()
+    }
+
+    function cellType (cell) {
+      for (var i = 0; i < towers.length; i++)
+        if (towers[i].x == cell[0] && towers[i].y == cell[1])
+          return {type: 'tower', index: i}
+
+      for (var i = 0; i < path.length; i++)
+        if (path[i].x == cell[0] && path[i].y == cell[1])
+          return {type: 'path', index: i}
+
+      return {type: 'blank', index: -1}
+    }
+
+    // Drawing
+
+    function draw () {
+      context.clearRect(0, 0, canvas.width, canvas.height)
+
+      //draw path
+      for (var i = 0; i < path.length; i++) {
+        var pathpoint = path[i]
+        context.beginPath()
+        context.rect(pathpoint.x * cellSize, pathpoint.y * cellSize, cellSize, cellSize)
+        context.fillStyle = pathpoint.color
+        context.fill()
+      }
+
+      // draw towers
+      for (var i = 0; i < towers.length; i++) {
+        var tower = towers[i]
+
+        // tower area effect
+        context.beginPath()
+        context.arc(tower.x * cellSize + cellSize/2, tower.y * cellSize + cellSize/2, tower.range * cellSize, 0, 2 * Math.PI, false)
+        context.fillStyle = tower.color
+        context.save()
+        context.globalAlpha = 0.3
+        context.fill()
+        context.restore()
+
+        // tower position
+        context.beginPath()
+        context.rect(tower.x * cellSize, tower.y * cellSize, cellSize, cellSize)
+        context.fillStyle = tower.color
+        context.fill()
+      }
+    }
+
+    // Phases
+
+    function towerPlacement () {
+      phase = 'towerPlacement'
+    }
+
+    function originalPathing () {
+      phase = 'originalPathing'
+    }
+
+    function selectArmy () {
+      phase = 'blank'
+      var newArmy = window.prompt('Define army', JSON.stringify(army))
+      army = JSON.parse(newArmy)
+    }
+
+    // Classes
+
+    function Tower (cell) {
+      this.x = cell[0]
+      this.y = cell[1]
+
+      this.range = 2
+
+      this.color = 'red'
+    }
+
+    function Pathpoint (cell) {
+      this.x = cell[0]
+      this.y = cell[1]
+
+      this.color = 'yellow'
+    }
+
+    // function Unit () {
+    //   this.dead = false
+    //   this.x = -1
+    //   this.y = -1
+    //   this.velocity = 100
+
+    //   this.die = function () {
+    //     document.getElementById('units').removeChild(this.el)
+    //     this.dead = true
+    //   }
+
+    //   this.win = function() {
+    //     console.log(this, 'wins')
+    //     this.die()
+    //   }
+    // }
+
+    // function Kryl (order) {
+    //   Unit.apply(this, arguments)
+
+    //   this.hp = 25
+    //   this.cost = 200
+
+    //   this.el.className = 'kryl'
+    // }
+
+
+  </script>
+</body>
+</html>
