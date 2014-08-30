@@ -66,7 +66,6 @@
     var towers = []
       , army = []
       , units = []
-      , graveyard = []
       , ammo = []
       , path = []
       , linePath = []
@@ -275,7 +274,8 @@
       for (var i = 0; i < units.length; i++) {
         var unit = units[i]
 
-        if (new Date(date - startTime).getTime()/1000 < (i + graveyard.length))
+        // FIXME: not sure about this method      
+        if (new Date(date - startTime).getTime()/1000 < unit.order)
           break;
 
         unit.distance += unit.velocity * (delta / 1000)
@@ -351,10 +351,10 @@
       for (var i = 0; i < army.length; i++) {
         switch (army[i]) {
           case 0:
-            units.push(new Kryl())
+            units.push(new Kryl(i))
             break
           case 1:
-            units.push(new Krei())
+            units.push(new Krei(i))
             break
           default:
             break
@@ -485,10 +485,11 @@
       this.color = 'yellow'
     }
 
-    function Unit () {
+    function Unit (order) {
       this.dead = false
       this.distance = 0
       this.damage = 0
+      this.order = order
       this.coords = {
         x: -20,
         y: 20
@@ -501,12 +502,11 @@
 
       this.die = function () {
         units.splice(units.indexOf(this), 1)
-        graveyard.push(this)
         console.log('argl')
       }
     }
 
-    function Kryl () {
+    function Kryl (order) {
       Unit.apply(this, arguments)
 
       this._type = 'kryl'
@@ -517,7 +517,7 @@
       this.color = '#f48000'
     }
 
-    function Krei () {
+    function Krei (order) {
       Unit.apply(this, arguments)
 
       this._type = 'krei'
