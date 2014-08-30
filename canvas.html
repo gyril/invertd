@@ -252,8 +252,12 @@
     // Tick
 
     function tick (prevDate) {
+      if (units.length == 0)
+        return
+
       var date = new Date()
 
+      // advance units
       for (var i = 0; i < units.length; i++) {
         var unit = units[i]
         if (new Date(date - startTime).getTime()/1000 < i)
@@ -263,10 +267,25 @@
 
         if (unit.distance >= linePathLength) {
           unit.win()
-          break;
+          break
         }
-        
+
         unit.coords = getPositionFromDistance(Math.round(unit.distance))
+      }
+
+      // fire towers
+      for (var i = 0; i < towers.length; i++) {
+        var tower = towers[i]
+        if (tower.lastFired + tower.reloadTime > date.getTime())
+          break
+
+        for (var j = 0; j < units.length; j++) {
+
+          if (getDistanceBetween(units[j].coords, getCenter(tower)) < tower.range * cellSize && tower.lastFired != date.getTime()) {
+            tower.lastFired = date.getTime()
+            tower.fire(units[j])
+          }
+        }
       }
 
       drawUnits()
@@ -347,12 +366,10 @@
         if (getDirection(waypoints[i+1], waypoints[i]) != getDirection(waypoints[i], waypoints[i-1])) {
           linePath.push(waypoints[i])
           linePathLength += getDistanceBetween(linePath[linePath.length-1], linePath[linePath.length-2])
-          console.log(linePathLength)
         }
 
       linePath.push(waypoints[waypoints.length-1])
       linePathLength += getDistanceBetween(linePath[linePath.length-1], linePath[linePath.length-2])
-      console.log(linePathLength)
     }
 
     function getDirection(pathpoint1, pathpoint0) {
@@ -374,7 +391,7 @@
     }
 
     function getDistanceBetween(p1, p2) {
-      return Math.abs(p1.x - p2.x) + Math.abs(p1.y - p2.y)
+      return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2))
     }
 
     function getPositionInSegment(p1, p2, d) {
@@ -391,8 +408,15 @@
       this.y = cell[1]
 
       this.range = 2
-
+      this.damage = 20
+      this.reloadTime = 2000
+      this.lastFired = 0
       this.color = 'red'
+
+      this.fire = function (target) {
+        target.hp -= this.damage
+        console.log(target.hp)
+      }
     }
 
     function Pathpoint (cell) {
@@ -419,7 +443,7 @@
       Unit.apply(this, arguments)
 
       this._type = 'kryl'
-      this.hp = 25
+      this.hp = 250
       this.cost = 200
       this.velocity = 30
       this.color = 'pink'
@@ -429,7 +453,7 @@
       Unit.apply(this, arguments)
 
       this._type = 'krei'
-      this.hp = 50
+      this.hp = 500
       this.cost = 500
       this.velocity = 30
       this.color = 'black'
