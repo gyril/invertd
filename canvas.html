@@ -277,7 +277,7 @@
         var unit = units[i]
 
         // FIXME: not sure about this method      
-        if (new Date(date - startTime).getTime()/1000 < unit.order)
+        if (new Date(date - startTime).getTime()/1000 * 2 < unit.order)
           break;
 
         unit.distance += unit.velocity * (delta / 1000)
@@ -514,7 +514,7 @@
       this._type = 'kryl'
       this.hp = 250
       this.cost = 200
-      this.velocity = 30
+      this.velocity = 60
       this.size = 5
       this.color = '#f48000'
     }
@@ -525,7 +525,7 @@
       this._type = 'krei'
       this.hp = 500
       this.cost = 500
-      this.velocity = 30
+      this.velocity = 60
       this.size = 6
       this.color = '#3f83a3'
     }
