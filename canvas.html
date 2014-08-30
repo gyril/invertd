@@ -66,6 +66,7 @@
     var towers = []
       , army = []
       , units = []
+      , graveyard = []
       , ammo = []
       , path = []
       , linePath = []
@@ -273,7 +274,8 @@
       // advance units
       for (var i = 0; i < units.length; i++) {
         var unit = units[i]
-        if (new Date(date - startTime).getTime()/1000 < i)
+
+        if (new Date(date - startTime).getTime()/1000 < (i + graveyard.length))
           break;
 
         unit.distance += unit.velocity * (delta / 1000)
@@ -307,8 +309,15 @@
         round.coords.x += Math.cos(round.direction) * round.velocity * (delta / 1000)
         round.coords.y += Math.sin(round.direction) * round.velocity * (delta / 1000)
 
+        round.direction = getDirection(round.target.coords, round.coords)
+
         if(round.coords.x > width || round.coords.x < 0 || round.coords.y > height || round.coords.y < 0)
           round.destroy()
+
+        if(getDistanceBetween(round.coords, round.target.coords) < round.target.size) {
+          round.hit()
+          round.destroy()
+        }
       }
 
       drawUnits()
@@ -431,18 +440,16 @@
       this.y = cell[1]
 
       this.range = 2
-      this.damage = 10
+      this.damage = 100
       this.reloadTime = 500
       this.lastFired = 0
       this.size = 20
       this.color = 'red'
 
       this.fire = function (target) {
-        target.damage += this.damage
         ammo.push(new Round(this, target))
-        if (target.damage >= target.hp)
-          target.die()
       }
+        
     }
 
     function Round (tower, target) {
@@ -451,17 +458,21 @@
         y: getCenter(tower).y
       }
 
-      this.velocity = 400
+      this.velocity = 300
       this.direction = getDirection(target.coords, getCenter(tower))
       this.size = 2
+      this.damage = tower.damage
 
-      this.target = {
-        x: target.coords.x,
-        y: target.coords.y
-      }
+      this.target = target
 
       this.destroy = function () {
         ammo.splice(ammo.indexOf(this), 1)
+      }
+
+      this.hit = function () {
+        target.damage += this.damage
+        if (target.damage >= target.hp)
+          target.die()
       }
 
       this.color = tower.color
@@ -490,6 +501,7 @@
 
       this.die = function () {
         units.splice(units.indexOf(this), 1)
+        graveyard.push(this)
         console.log('argl')
       }
     }
