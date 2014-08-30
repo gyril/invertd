@@ -9,10 +9,14 @@
     left: 50px;
   }
 
-  #canvas {
+  #canvas, #sprites {
     position: absolute;
     top: 50px;
     left: 50px;
+  }
+
+  #sprites {
+    pointer-events: none;
   }
 
   </style>
@@ -21,12 +25,14 @@
   <button onclick="towerPlacement()">tower placement</button>
   <button onclick="originalPathing()">draw original path</button>
   <button onclick="selectArmy()">select army</button>
-  <button>play</button>
+  <button onclick="play()">play</button>
   <button onclick="reset()">reset</button>
   <br>
   <canvas id="board">
   </canvas>
   <canvas id="canvas">
+  </canvas>
+  <canvas id="sprites">
   </canvas>
 
   
@@ -34,13 +40,17 @@
   <script type="text/javascript">  
     var board = document.getElementById('board')
       , canvas = document.getElementById('canvas')
+      , sprites = document.getElementById('sprites')
       , boardContext = board.getContext('2d')
       , context = canvas.getContext('2d')
+      , spritesContext = sprites.getContext('2d')
       , cellSize = 40
       , phase = 'blank'
       , drag = false
       , mousedown = false
       , currentCell = [-1, -1]
+      , startTime
+      , _tick
 
     //canvas.addEventListener('click', clickCanvas, false)
     canvas.addEventListener('mousedown', mouseDown, false)
@@ -55,7 +65,10 @@
 
     var towers = []
       , army = []
+      , units = []
       , path = []
+      , linePath = []
+      , linePathLength = 0
 
     board.width = width
     board.height = height
@@ -65,6 +78,10 @@
     canvas.height = height
     canvas.style.width = width + 'px'
     canvas.style.height = height + 'px'
+    sprites.width = width
+    sprites.height = height
+    sprites.style.width = width + 'px'
+    sprites.style.height = height + 'px'
 
     drawCells()
 
@@ -214,9 +231,52 @@
 
         // tower position
         context.beginPath()
-        context.rect(tower.x * cellSize, tower.y * cellSize, cellSize, cellSize)
+        context.rect(tower.x * cellSize + 10, tower.y * cellSize + 10, cellSize - 20, cellSize - 20)
         context.fillStyle = tower.color
         context.fill()
+      }
+    }
+
+    function drawUnits () {
+      spritesContext.clearRect(0, 0, sprites.width, sprites.height)
+
+      for (var i = 0; i < units.length; i++) {
+        var unit = units[i]
+        spritesContext.beginPath()
+        spritesContext.arc(unit.coords.x, unit.coords.y, cellSize/8, 0, 2 * Math.PI, false)
+        spritesContext.fillStyle = unit.color
+        spritesContext.fill()
+      }
+    }
+
+    // Tick
+
+    function tick (prevDate) {
+      var date = new Date()
+
+      for (var i = 0; i < units.length; i++) {
+        var unit = units[i]
+        if (new Date(date - startTime).getTime()/1000 < i)
+          break;
+
+        unit.distance += unit.velocity * ((new Date(date - prevDate).getTime()) / 1000)
+
+        if (unit.distance >= linePathLength) {
+          unit.win()
+          break;
+        }
+        
+        unit.coords = getPositionFromDistance(Math.round(unit.distance))
+      }
+
+      drawUnits()
+      _tick = window.setTimeout(function() { tick(date) }, 10)
+    }
+
+    function getCenter(pathpoint) {
+      return {
+        x: pathpoint.x * cellSize + cellSize/2,
+        y: pathpoint.y * cellSize + cellSize/2
       }
     }
 
@@ -234,6 +294,94 @@
       phase = 'blank'
       var newArmy = window.prompt('Define army', JSON.stringify(army))
       army = JSON.parse(newArmy)
+    }
+
+    function play () {
+      for (var i = 0; i < army.length; i++) {
+        switch (army[i]) {
+          case 0:
+            units.push(new Kryl())
+            break
+          case 1:
+            units.push(new Krei())
+            break
+          default:
+            break
+        }
+      }
+
+      orderPath()
+      setlinePath()
+      startTime = new Date()
+      tick(startTime)
+    }
+
+    function orderPath() {
+      for (var i = 1; i < path.length; i++) {
+        var pathpoint0 = path[i]
+          , k = -1
+
+        for (var j = i; j<path.length; j++) {
+          if(Math.abs(path[i-1].x - path[j].x) + Math.abs(path[i-1].y - path[j].y) == 1)
+            k = j
+        }
+
+        if (k < 0) {
+          alert('route non continue')
+          return
+        }
+
+        path[i] = path[k]
+        path[k] = pathpoint0
+      }
+    }
+
+    function setlinePath () {
+      var waypoints = []
+      for (var i = 0; i < path.length; i++)
+        waypoints.push(getCenter(path[i]))
+
+      linePath.push(waypoints[0])
+
+      for (var i = 1; i < waypoints.length - 1; i++)
+        if (getDirection(waypoints[i+1], waypoints[i]) != getDirection(waypoints[i], waypoints[i-1])) {
+          linePath.push(waypoints[i])
+          linePathLength += getDistanceBetween(linePath[linePath.length-1], linePath[linePath.length-2])
+          console.log(linePathLength)
+        }
+
+      linePath.push(waypoints[waypoints.length-1])
+      linePathLength += getDistanceBetween(linePath[linePath.length-1], linePath[linePath.length-2])
+      console.log(linePathLength)
+    }
+
+    function getDirection(pathpoint1, pathpoint0) {
+      return Math.atan2( pathpoint1.y - pathpoint0.y, pathpoint1.x - pathpoint0.x )
+    }
+
+    function getPositionFromDistance(distance) {
+      var d = distance
+        , i = 0
+        , segmentLength = getDistanceBetween(linePath[i+1], linePath[i])
+
+      while (d > segmentLength) {
+        i++
+        d -= segmentLength
+        segmentLength = getDistanceBetween(linePath[i+1], linePath[i])
+      }
+
+      return getPositionInSegment(linePath[i+1], linePath[i], d)
+    }
+
+    function getDistanceBetween(p1, p2) {
+      return Math.abs(p1.x - p2.x) + Math.abs(p1.y - p2.y)
+    }
+
+    function getPositionInSegment(p1, p2, d) {
+      return {
+        x: p2.x + d * (p1.x - p2.x ? p1.x - p2.x < 0 ? -1 : 1 : 0),
+        y: p2.y + d * (p1.y - p2.y ? p1.y - p2.y < 0 ? -1 : 1 : 0)
+      }
     }
 
     // Classes
@@ -254,31 +402,38 @@
       this.color = 'yellow'
     }
 
-    // function Unit () {
-    //   this.dead = false
-    //   this.x = -1
-    //   this.y = -1
-    //   this.velocity = 100
+    function Unit () {
+      this.dead = false
+      this.distance = 0
+      this.coords = {
+        x: -20,
+        y: 20
+      }
 
-    //   this.die = function () {
-    //     document.getElementById('units').removeChild(this.el)
-    //     this.dead = true
-    //   }
+      this.win = function () {
+        units.splice(units.indexOf(this), 1)
+      }
+    }
 
-    //   this.win = function() {
-    //     console.log(this, 'wins')
-    //     this.die()
-    //   }
-    // }
+    function Kryl () {
+      Unit.apply(this, arguments)
 
-    // function Kryl (order) {
-    //   Unit.apply(this, arguments)
+      this._type = 'kryl'
+      this.hp = 25
+      this.cost = 200
+      this.velocity = 30
+      this.color = 'pink'
+    }
 
-    //   this.hp = 25
-    //   this.cost = 200
+    function Krei () {
+      Unit.apply(this, arguments)
 
-    //   this.el.className = 'kryl'
-    // }
+      this._type = 'krei'
+      this.hp = 50
+      this.cost = 500
+      this.velocity = 30
+      this.color = 'black'
+    }
 
 
   </script>
