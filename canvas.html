@@ -66,6 +66,7 @@
     var towers = []
       , army = []
       , units = []
+      , ammo = []
       , path = []
       , linePath = []
       , linePathLength = 0
@@ -225,7 +226,7 @@
         context.arc(tower.x * cellSize + cellSize/2, tower.y * cellSize + cellSize/2, tower.range * cellSize, 0, 2 * Math.PI, false)
         context.fillStyle = tower.color
         context.save()
-        context.globalAlpha = 0.3
+        context.globalAlpha = 0.2
         context.fill()
         context.restore()
 
@@ -245,6 +246,17 @@
         spritesContext.beginPath()
         spritesContext.arc(unit.coords.x, unit.coords.y, cellSize/8, 0, 2 * Math.PI, false)
         spritesContext.fillStyle = unit.color
+        spritesContext.save()
+        spritesContext.globalAlpha = 1 - unit.damage / unit.hp
+        spritesContext.fill()
+        spritesContext.restore()
+      }
+
+      for (var i = 0; i < ammo.length; i++) {
+        var round = ammo[i]
+        spritesContext.beginPath()
+        spritesContext.arc(round.coords.x, round.coords.y, cellSize/20, 0, 2 * Math.PI, false)
+        spritesContext.fillStyle = round.color
         spritesContext.fill()
       }
     }
@@ -255,7 +267,8 @@
       if (units.length == 0)
         return
 
-      var date = new Date()
+      var date = new Date(),
+          delta = (new Date(date - prevDate).getTime())
 
       // advance units
       for (var i = 0; i < units.length; i++) {
@@ -263,7 +276,7 @@
         if (new Date(date - startTime).getTime()/1000 < i)
           break;
 
-        unit.distance += unit.velocity * ((new Date(date - prevDate).getTime()) / 1000)
+        unit.distance += unit.velocity * (delta / 1000)
 
         if (unit.distance >= linePathLength) {
           unit.win()
@@ -286,6 +299,13 @@
             tower.fire(units[j])
           }
         }
+      }
+
+      // advance ammo
+      for (var i = 0; i < ammo.length; i++) {
+        var round = ammo[i]
+        round.coords.x += Math.cos(round.direction) * round.velocity * (delta / 1000)
+        round.coords.y += Math.sin(round.direction) * round.velocity * (delta / 1000)
       }
 
       drawUnits()
@@ -408,15 +428,34 @@
       this.y = cell[1]
 
       this.range = 2
-      this.damage = 20
-      this.reloadTime = 2000
+      this.damage = 2
+      this.reloadTime = 100
       this.lastFired = 0
       this.color = 'red'
 
       this.fire = function (target) {
-        target.hp -= this.damage
-        console.log(target.hp)
+        target.damage += this.damage
+        ammo.push(new Round(this, target))
+        if (target.damage >= target.hp)
+          target.die()
       }
+    }
+
+    function Round (tower, target) {
+      this.coords = {
+        x: getCenter(tower).x,
+        y: getCenter(tower).y
+      }
+
+      this.velocity = 300
+      this.direction = getDirection(target.coords, getCenter(tower))
+
+      this.target = {
+        x: target.coords.x,
+        y: target.coords.y
+      }
+
+      this.color = tower.color
     }
 
     function Pathpoint (cell) {
@@ -429,6 +468,7 @@
     function Unit () {
       this.dead = false
       this.distance = 0
+      this.damage = 0
       this.coords = {
         x: -20,
         y: 20
@@ -436,6 +476,12 @@
 
       this.win = function () {
         units.splice(units.indexOf(this), 1)
+        console.log('yeah')
+      }
+
+      this.die = function () {
+        units.splice(units.indexOf(this), 1)
+        console.log('argl')
       }
     }
 
@@ -446,7 +492,7 @@
       this.hp = 250
       this.cost = 200
       this.velocity = 30
-      this.color = 'pink'
+      this.color = '#f48000'
     }
 
     function Krei () {
@@ -456,9 +502,20 @@
       this.hp = 500
       this.cost = 500
       this.velocity = 30
-      this.color = 'black'
+      this.color = '#3f83a3'
     }
 
+    // Color manipulation
+
+    function shadeColor(color, percent) {   
+      var f=parseInt(color.slice(1),16),t=percent<0?0:255,p=percent<0?percent*-1:percent,R=f>>16,G=f>>8&0x00FF,B=f&0x0000FF
+      return "#"+(0x1000000+(Math.round((t-R)*p)+R)*0x10000+(Math.round((t-G)*p)+G)*0x100+(Math.round((t-B)*p)+B)).toString(16).slice(1)
+    }
+
+    function blendColors(c0, c1, p) {
+        var f=parseInt(c0.slice(1),16),t=parseInt(c1.slice(1),16),R1=f>>16,G1=f>>8&0x00FF,B1=f&0x0000FF,R2=t>>16,G2=t>>8&0x00FF,B2=t&0x0000FF
+        return "#"+(0x1000000+(Math.round((R2-R1)*p)+R1)*0x10000+(Math.round((G2-G1)*p)+G1)*0x100+(Math.round((B2-B1)*p)+B1)).toString(16).slice(1)
+    }
 
   </script>
 </body>
