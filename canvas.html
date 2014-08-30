@@ -64,7 +64,7 @@
       , height = gridHeight * cellSize
 
     var towers = []
-      , army = []
+      , army = [0,0,0,0,0,1,1,1,1]
       , units = []
       , ammo = []
       , path = []
@@ -157,10 +157,12 @@
     }
 
     function reset () {
-      towers = []
-      path = []
+      units = []
+      ammo = []
+      linePath = []
+      linePathLength = 0
 
-      draw()
+      drawUnits()
     }
 
     function toggleTower (cell) {
