@@ -223,7 +223,7 @@
 
         // tower area effect
         context.beginPath()
-        context.arc(tower.x * cellSize + cellSize/2, tower.y * cellSize + cellSize/2, tower.range * cellSize, 0, 2 * Math.PI, false)
+        context.arc(getCenter(tower).x, getCenter(tower).y, tower.range * cellSize, 0, 2 * Math.PI, false)
         context.fillStyle = tower.color
         context.save()
         context.globalAlpha = 0.2
@@ -232,7 +232,7 @@
 
         // tower position
         context.beginPath()
-        context.rect(tower.x * cellSize + 10, tower.y * cellSize + 10, cellSize - 20, cellSize - 20)
+        context.rect(tower.x * cellSize + (cellSize - tower.size) / 2, tower.y * cellSize + (cellSize - tower.size) / 2, tower.size, tower.size)
         context.fillStyle = tower.color
         context.fill()
       }
@@ -244,7 +244,7 @@
       for (var i = 0; i < units.length; i++) {
         var unit = units[i]
         spritesContext.beginPath()
-        spritesContext.arc(unit.coords.x, unit.coords.y, cellSize/8, 0, 2 * Math.PI, false)
+        spritesContext.arc(unit.coords.x, unit.coords.y, unit.size, 0, 2 * Math.PI, false)
         spritesContext.fillStyle = unit.color
         spritesContext.save()
         spritesContext.globalAlpha = 1 - unit.damage / unit.hp
@@ -255,7 +255,7 @@
       for (var i = 0; i < ammo.length; i++) {
         var round = ammo[i]
         spritesContext.beginPath()
-        spritesContext.arc(round.coords.x, round.coords.y, cellSize/20, 0, 2 * Math.PI, false)
+        spritesContext.arc(round.coords.x, round.coords.y, round.size, 0, 2 * Math.PI, false)
         spritesContext.fillStyle = round.color
         spritesContext.fill()
       }
@@ -306,10 +306,13 @@
         var round = ammo[i]
         round.coords.x += Math.cos(round.direction) * round.velocity * (delta / 1000)
         round.coords.y += Math.sin(round.direction) * round.velocity * (delta / 1000)
+
+        if(round.coords.x > width || round.coords.x < 0 || round.coords.y > height || round.coords.y < 0)
+          round.destroy()
       }
 
       drawUnits()
-      _tick = window.setTimeout(function() { tick(date) }, 10)
+      _tick = window.setTimeout(function() { tick(date) }, 1000/60)
     }
 
     function getCenter(pathpoint) {
@@ -428,9 +431,10 @@
       this.y = cell[1]
 
       this.range = 2
-      this.damage = 2
-      this.reloadTime = 100
+      this.damage = 10
+      this.reloadTime = 500
       this.lastFired = 0
+      this.size = 20
       this.color = 'red'
 
       this.fire = function (target) {
@@ -447,12 +451,17 @@
         y: getCenter(tower).y
       }
 
-      this.velocity = 300
+      this.velocity = 400
       this.direction = getDirection(target.coords, getCenter(tower))
+      this.size = 2
 
       this.target = {
         x: target.coords.x,
         y: target.coords.y
+      }
+
+      this.destroy = function () {
+        ammo.splice(ammo.indexOf(this), 1)
       }
 
       this.color = tower.color
@@ -492,6 +501,7 @@
       this.hp = 250
       this.cost = 200
       this.velocity = 30
+      this.size = 5
       this.color = '#f48000'
     }
 
@@ -502,6 +512,7 @@
       this.hp = 500
       this.cost = 500
       this.velocity = 30
+      this.size = 6
       this.color = '#3f83a3'
     }
 
