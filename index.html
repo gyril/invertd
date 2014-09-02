@@ -1,297 +1,299 @@
-<html>
-<head>
-  <title>Invertd</title>
-  <style type="text/css">
-  #canvas {
-    border-top: 1px solid black;
-    border-left: 1px solid black;
-    border-bottom: 2px solid black;
-    border-right: 2px solid black;
-    width: 525px;
-    height: 525px;
-    margin: 50px auto;
-  }
+<!DOCTYPE html>
+<meta charset="utf-8">
 
-  .cell {
-    width: 25px;
-    height: 25px;
-    float: left;
-    border-top: 1px solid black;
-    border-left: 1px solid black;
-    box-sizing: border-box;
-  }
+  <head>
+    <title>Invertd</title>
+    <style type="text/css">
+    #canvas {
+      border-top: 1px solid black;
+      border-left: 1px solid black;
+      border-bottom: 2px solid black;
+      border-right: 2px solid black;
+      width: 525px;
+      height: 525px;
+      margin: 50px auto;
+    }
 
-  .tower {
-    background-color: red
-  }
+    .cell {
+      width: 25px;
+      height: 25px;
+      float: left;
+      border-top: 1px solid black;
+      border-left: 1px solid black;
+      box-sizing: border-box;
+    }
 
-  .road {
-    background-color: yellow
-  }
+    .tower {
+      background-color: red
+    }
 
-  #units {
-    position: absolute;
-    width: 525px;
-    height: 525px;
-    pointer-events: none;
-  }
+    .road {
+      background-color: yellow
+    }
 
-  .kryl {
-    position: absolute;
-    width: 5px;
-    height: 5px;
-    border-radius: 5px;
-    background-color: purple;
-  }
+    #units {
+      position: absolute;
+      width: 525px;
+      height: 525px;
+      pointer-events: none;
+    }
 
-  .krei {
-    position: absolute;
-    width: 5px;
-    height: 5px;
-    border-radius: 5px;
-    background-color: black;
-  }
-  </style>
-</head>
-<body>
-  <button id="road" onclick="toggleroad()">validate road</button><button id="start" onclick="tick()">go</button><br>
-  army (0 = kryl, 1 = krei; separate with ,) <input type="text" id="army" /> <button onclick="validatearmy()">validate army</button>
-  <div id="budget"></div>
+    .kryl {
+      position: absolute;
+      width: 5px;
+      height: 5px;
+      border-radius: 5px;
+      background-color: purple;
+    }
 
-  <div id="canvas">
-    <div id="units"></div>
-  </div>
+    .krei {
+      position: absolute;
+      width: 5px;
+      height: 5px;
+      border-radius: 5px;
+      background-color: black;
+    }
+    </style>
+  </head>
+  <body>
+    <button id="road" onclick="toggleroad()">validate road</button><button id="start" onclick="tick()">go</button><br>
+    army (0 = kryl, 1 = krei; separate with ,) <input type="text" id="army" /> <button onclick="validatearmy()">validate army</button>
+    <div id="budget"></div>
 
-  
+    <div id="canvas">
+      <div id="units"></div>
+    </div>
 
-  <script type="text/javascript">
-    var canvas = document.getElementById('canvas')
-      , roadbuilding = true
-      , budget = 4000
-      , towers = [
-        new Tower(8, 3),
-        new Tower(8, 11),
-        new Tower(12, 9),
-        new Tower(12, 17)
-      ]
-      , start = [10, 0]
-      , end = [10, 20]
-      , road = [[10,0],[10,1],[10,2],[10,3],[10,4],[10,5],[10,6],[10,7],[10,8],[10,9],[10,10],[10,11],[10,12],[10,13],[10,14],[10,15],[10,16],[10,17],[10,18],[10,19],[10,20]]
-      , path = []
-      , cells = []
-      , units = []
-      , tickID
-  
+    
 
-    function init () {
-      updateBudget()
+    <script type="text/javascript">
+      var canvas = document.getElementById('canvas')
+        , roadbuilding = true
+        , budget = 4000
+        , towers = [
+          new Tower(8, 3),
+          new Tower(8, 11),
+          new Tower(12, 9),
+          new Tower(12, 17)
+        ]
+        , start = [10, 0]
+        , end = [10, 20]
+        , road = [[10,0],[10,1],[10,2],[10,3],[10,4],[10,5],[10,6],[10,7],[10,8],[10,9],[10,10],[10,11],[10,12],[10,13],[10,14],[10,15],[10,16],[10,17],[10,18],[10,19],[10,20]]
+        , path = []
+        , cells = []
+        , units = []
+        , tickID
+    
 
-      for (var i = 0; i < 21; i++) {
-        cells[i] = []
-        for (var j = 0; j < 21; j++) {
-          var cell = document.createElement('div')
-          cell.className = 'cell'
-          cell.dataset.x = i
-          cell.dataset.y = j
-          //cell.addEventListener('mouseenter', enterCell, false)
-          cells[i][j] = cell
-          canvas.appendChild(cell)
+      function init () {
+        updateBudget()
+
+        for (var i = 0; i < 21; i++) {
+          cells[i] = []
+          for (var j = 0; j < 21; j++) {
+            var cell = document.createElement('div')
+            cell.className = 'cell'
+            cell.dataset.x = i
+            cell.dataset.y = j
+            //cell.addEventListener('mouseenter', enterCell, false)
+            cells[i][j] = cell
+            canvas.appendChild(cell)
+          }
+        }
+
+        var startCell = cells[start[0]][start[1]]
+        startCell.className += ' road start'
+        path.push(startCell)
+        
+        var endCell = cells[end[0]][end[1]]
+        endCell.className += ' road end'
+        path.push(endCell)
+        
+        for (var i = 0; i < road.length; i++) {
+          cells[road[i][0]][road[i][1]].className += ' road'
+        }
+
+        for (var i = 0; i < towers.length; i++) {
+          makeTower(towers[i].x, towers[i].y)
+        }
+
+      }
+
+      function tick() {
+        for (var i = 0; i < towers.length; i++) {
+          towers[i].hasfired = false
+        }
+
+        for (var i = 0; i < units.length; i++) {
+          var unit = units[i]
+          if (!unit.dead) {
+            updateHP(unit)
+            unit.position++
+            if (unit.position > road.length && !unit.dead)
+              unit.win()
+          }
+        }
+
+        draw()
+        tickID = window.setTimeout(tick, 500)
+      }
+
+      function draw () {
+        for (var i = 0; i < units.length; i++) {
+          if (units[i].position > -1 && units[i].position < road.length) {
+            units[i].el.style.top = road[units[i].position][0] * 25 + 10
+            units[i].el.style.left = road[units[i].position][1] * 25 + 10
+            units[i].el.textContent = units[i].hp
+          } else if (units[i].position >= road.length) {
+            units[i].el.style.visibility = 'hidden'
+          }
         }
       }
 
-      var startCell = cells[start[0]][start[1]]
-      startCell.className += ' road start'
-      path.push(startCell)
-      
-      var endCell = cells[end[0]][end[1]]
-      endCell.className += ' road end'
-      path.push(endCell)
-      
-      for (var i = 0; i < road.length; i++) {
-        cells[road[i][0]][road[i][1]].className += ' road'
+      function makeTower (x, y) {
+        cells[x][y].className += ' tower'
       }
 
-      for (var i = 0; i < towers.length; i++) {
-        makeTower(towers[i].x, towers[i].y)
-      }
+      function updateHP (unit) {
 
-    }
+        for (var i = 0; i < towers.length; i++) {
+          if (unit.position > 0 && unit.position < road.length && Math.abs(road[unit.position][0] - towers[i].x) < 3 && Math.abs(road[unit.position][1] - towers[i].y) < 3 && !towers[i].hasfired) {
+            unit.hp -= 10
+            towers[i].hasfired = true
+          }
+        }
 
-    function tick() {
-      for (var i = 0; i < towers.length; i++) {
-        towers[i].hasfired = false
-      }
-
-      for (var i = 0; i < units.length; i++) {
-        var unit = units[i]
-        if (!unit.dead) {
-          updateHP(unit)
-          unit.position++
-          if (unit.position > road.length && !unit.dead)
-            unit.win()
+        if (unit.hp <= 0) {
+          unit.die()
         }
       }
 
-      draw()
-      tickID = window.setTimeout(tick, 500)
-    }
+      function Unit (order) {
+        this.position = (-1 * order * 2) - 1
+        this.dead = false
+        
+        this.el = document.createElement('div')
+        document.getElementById('units').appendChild(this.el)
 
-    function draw () {
-      for (var i = 0; i < units.length; i++) {
-        if (units[i].position > -1 && units[i].position < road.length) {
-          units[i].el.style.top = road[units[i].position][0] * 25 + 10
-          units[i].el.style.left = road[units[i].position][1] * 25 + 10
-          units[i].el.textContent = units[i].hp
-        } else if (units[i].position >= road.length) {
-          units[i].el.style.visibility = 'hidden'
+        this.die = function () {
+          document.getElementById('units').removeChild(this.el)
+          this.dead = true
         }
-      }
-    }
 
-    function makeTower (x, y) {
-      cells[x][y].className += ' tower'
-    }
-
-    function updateHP (unit) {
-
-      for (var i = 0; i < towers.length; i++) {
-        if (unit.position > 0 && unit.position < road.length && Math.abs(road[unit.position][0] - towers[i].x) < 3 && Math.abs(road[unit.position][1] - towers[i].y) < 3 && !towers[i].hasfired) {
-          unit.hp -= 10
-          towers[i].hasfired = true
+        this.win = function() {
+          console.log(this, 'wins')
+          this.die()
         }
       }
 
-      if (unit.hp <= 0) {
-        unit.die()
-      }
-    }
+      function Kryl (order) {
+        Unit.apply(this, arguments)
 
-    function Unit (order) {
-      this.position = (-1 * order * 2) - 1
-      this.dead = false
-      
-      this.el = document.createElement('div')
-      document.getElementById('units').appendChild(this.el)
+        this.hp = 25
+        this.cost = 200
 
-      this.die = function () {
-        document.getElementById('units').removeChild(this.el)
-        this.dead = true
+        this.el.className = 'kryl'
       }
 
-      this.win = function() {
-        console.log(this, 'wins')
-        this.die()
+      function Krei (order) {
+        Unit.apply(this, arguments)
+
+        this.hp = 50
+        this.cost = 300
+
+        this.el.className = 'krei'
       }
-    }
 
-    function Kryl (order) {
-      Unit.apply(this, arguments)
+      function Tower (x, y) {
+        this.x = x
+        this.y = y
 
-      this.hp = 25
-      this.cost = 200
+        this.damage = 10
 
-      this.el.className = 'kryl'
-    }
+        this.hasfired = false
+      }
 
-    function Krei (order) {
-      Unit.apply(this, arguments)
-
-      this.hp = 50
-      this.cost = 300
-
-      this.el.className = 'krei'
-    }
-
-    function Tower (x, y) {
-      this.x = x
-      this.y = y
-
-      this.damage = 10
-
-      this.hasfired = false
-    }
-
-    init()
+      init()
 
 
-    function toggleroad () {
-      roadbuilding = !roadbuilding
-      document.getElementById('road').textContent = roadbuilding ? 'validate road' : 'edit road'
-      if (!roadbuilding)
-        checkroad()
-    }
+      function toggleroad () {
+        roadbuilding = !roadbuilding
+        document.getElementById('road').textContent = roadbuilding ? 'validate road' : 'edit road'
+        if (!roadbuilding)
+          checkroad()
+      }
 
-    function checkroad () {
-      var arr = path.map(function(el) {return [parseInt(el.dataset.x), parseInt(el.dataset.y)]})
+      function checkroad () {
+        var arr = path.map(function(el) {return [parseInt(el.dataset.x), parseInt(el.dataset.y)]})
 
-      var ordArr = []
+        var ordArr = []
 
-      for (var i=1; i < arr.length; i++) {
-        var arr0 = arr[i]
-          , k = -1
-        for (var j=i; j<arr.length; j++) {
-          if(Math.abs(arr[i-1][0] - arr[j][0]) + Math.abs(arr[i-1][1] - arr[j][1]) == 1)
-            k = j
+        for (var i=1; i < arr.length; i++) {
+          var arr0 = arr[i]
+            , k = -1
+          for (var j=i; j<arr.length; j++) {
+            if(Math.abs(arr[i-1][0] - arr[j][0]) + Math.abs(arr[i-1][1] - arr[j][1]) == 1)
+              k = j
+          }
+
+          if (k < 0) {
+            alert('route non continue')
+            return
+          }
+
+          arr[i] = arr[k]
+          arr[k] = arr0
         }
 
-        if (k < 0) {
-          alert('route non continue')
+        road = arr
+      }
+
+      function enterCell () {
+        if (roadbuilding)
+          toggleCell(this)
+      }
+
+      function toggleCell (cell) {
+        if(cell.className.indexOf('tower') > -1 || cell.className.indexOf('start') > -1 || cell.className.indexOf('end') > -1)
           return
+
+        if(cell.className.indexOf('road') > -1) {
+          budget += 100
+          cell.className = cell.className.replace( / road/ , '' )
+          path.splice(path.indexOf(cell), 1)
+        } else {
+          if (budget >= 100) {
+            budget -= 100
+            cell.className += ' road'
+            path.push(cell)
+          }
         }
 
-        arr[i] = arr[k]
-        arr[k] = arr0
+        updateBudget()
       }
 
-      road = arr
-    }
-
-    function enterCell () {
-      if (roadbuilding)
-        toggleCell(this)
-    }
-
-    function toggleCell (cell) {
-      if(cell.className.indexOf('tower') > -1 || cell.className.indexOf('start') > -1 || cell.className.indexOf('end') > -1)
-        return
-
-      if(cell.className.indexOf('road') > -1) {
-        budget += 100
-        cell.className = cell.className.replace( / road/ , '' )
-        path.splice(path.indexOf(cell), 1)
-      } else {
-        if (budget >= 100) {
-          budget -= 100
-          cell.className += ' road'
-          path.push(cell)
+      function validatearmy () {
+        for (var i=0; i < units.length; i++) {
+          budget += units[i].cost
         }
+
+        units = []
+
+        var army = eval('['+document.getElementById('army').value+']')
+        
+        for (var i=0; i < army.length; i++) {
+          var unit = (army[i] == 0) ? new Kryl(i) : new Krei(i)
+          units.push(unit)
+          budget -= unit.cost
+        }
+
+        updateBudget()
       }
 
-      updateBudget()
-    }
-
-    function validatearmy () {
-      for (var i=0; i < units.length; i++) {
-        budget += units[i].cost
+      function updateBudget () {
+        document.getElementById('budget').textContent = 'Flouze : ' + budget
       }
 
-      units = []
-
-      var army = eval('['+document.getElementById('army').value+']')
-      
-      for (var i=0; i < army.length; i++) {
-        var unit = (army[i] == 0) ? new Kryl(i) : new Krei(i)
-        units.push(unit)
-        budget -= unit.cost
-      }
-
-      updateBudget()
-    }
-
-    function updateBudget () {
-      document.getElementById('budget').textContent = 'Flouze : ' + budget
-    }
-
-  </script>
-</body>
+    </script>
+  </body>
 </html>
