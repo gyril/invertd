@@ -22,6 +22,7 @@
     }
 
     </style>
+    <script src="./astar.js"></script>
   </head>
   <body>
     <button onclick="towerPlacement()">tower placement</button>
@@ -46,7 +47,7 @@
         , boardContext = board.getContext('2d')
         , context = canvas.getContext('2d')
         , spritesContext = sprites.getContext('2d')
-        , cellSize = 40
+        , cellSize = 10
         , phase = 'blank'
         , drag = false
         , mousedown = false
@@ -54,16 +55,16 @@
         , startTime
         , _tick
 
-      //canvas.addEventListener('click', clickCanvas, false)
       canvas.addEventListener('mousedown', mouseDown, false)
       canvas.addEventListener('mouseup', mouseUp, false)
       canvas.addEventListener('mousemove', mouseMove, false)
 
-      var sizeString = window.prompt('map size (WxH)')
+      var sizeString = '44x44'
         , gridWidth = parseInt(sizeString.split('x')[0])
         , gridHeight = parseInt(sizeString.split('x')[1])
         , width = gridWidth * cellSize
         , height = gridHeight * cellSize
+        , grid = []
 
       var towers = []
         , army = [0,0,0,0,0,1,1,1,1]
@@ -72,6 +73,14 @@
         , path = []
         , linePath = []
         , linePathLength = 0
+        , startTile = {
+          x: 0,
+          y: 5
+        }
+        , endTile = {
+          x: 10,
+          y: 5
+        }
 
       board.width = width
       board.height = height
@@ -86,14 +95,9 @@
       sprites.style.width = width + 'px'
       sprites.style.height = height + 'px'
 
-      drawCells()
+      init()
 
       // Inputs 
-
-      function clickCanvas (e) {
-        var cellClicked = returnCell(e)
-        click(cellClicked)
-      }
 
       function mouseDown (e) {
         mousedown = true
@@ -113,7 +117,7 @@
         drag = true
 
         var previousCell = currentCell
-        currentCell = returnCell(e)
+        currentCell = returnCells(e, 1)[0]
 
         if (currentCell[0] != previousCell[0] || currentCell[1] != previousCell[1]) {
           clickCanvas(e)
@@ -121,24 +125,31 @@
           
       }
 
-      function click (cell) {
+      function clickCanvas (e) {
         switch (phase) {
           case 'towerPlacement':
-            toggleTower(cell)
-            break
-          case 'originalPathing':
-            togglePath(cell)
+            toggleTower(e)
             break
           default:
             break
         }
       }
 
-      function returnCell (e) {
-        return [Math.floor(e.offsetX/cellSize), Math.floor(e.offsetY/cellSize)]
+      function returnCell (point) {
+        return [Math.floor(point.x/cellSize), Math.floor(point.y/cellSize)]
       }
 
       // init
+
+      function init () {
+        for (var i = 0; i < gridWidth; i++) {
+          grid.push([])
+          for (var j = 0; j < gridHeight; j++)
+            grid[i].push(1)
+        }
+
+        drawCells()
+      }
 
       function drawCells () {
         for (var i=1; i < gridWidth; i++) {
@@ -165,8 +176,20 @@
         drawUnits()
       }
 
-      function toggleTower (cell) {
-        var _cell = cellType(cell)
+      function returnCells (e, squareSize) {
+        var cells = []
+          , center = {
+            x: e.offsetX,
+            y: e.offsetY
+          }
+
+        for (var i = 0; i < squareSize; i++)
+          cells.push(returnCell(center))
+      }
+
+      function toggleTower (e) {
+        if (!checkCells(e, 'Tower'))
+          return
 
         if (_cell.type == 'blank') {
           towers.push(new Tower(cell))
@@ -311,7 +334,7 @@
           round.coords.x += Math.cos(round.direction) * round.velocity * (delta / 1000)
           round.coords.y += Math.sin(round.direction) * round.velocity * (delta / 1000)
 
-          round.direction = getDirection(round.target.coords, round.coords)
+          round.direction = getDirection(round.coords, round.target.coords)
 
           if(round.coords.x > width || round.coords.x < 0 || round.coords.y > height || round.coords.y < 0)
             round.destroy()
@@ -363,10 +386,37 @@
           }
         }
 
-        orderPath()
+        computePath()
         setlinePath()
         startTime = new Date()
         tick(startTime)
+      }
+
+      function computePath() {
+        var graph = new Graph(generateGraph(), { diagonal: true })
+          , start = graph.grid[startTile.x][startTile.y]
+          , end = graph.grid[endTile.x][endTile.y]
+
+        var astarPath = astar.search(graph, start, end)
+
+        togglePath([startTile.x, startTile.y])
+
+        for (var i = 0; i < astarPath.length; i++)
+          togglePath([astarPath[i].x, astarPath[i].y])
+      }
+
+      function generateGraph() {
+        var graph = []
+
+        for (var i = 0; i < gridWidth; i++) {
+          graph.push([])
+          for (var j = 0; j < gridHeight; j++) {
+            var val = (cellType([i, j]).type == 'tower') ? 0 : 1
+            graph[i].push(val)
+          }
+        }
+
+        return graph
       }
 
       function orderPath() {
@@ -397,7 +447,7 @@
         linePath.push(waypoints[0])
 
         for (var i = 1; i < waypoints.length - 1; i++)
-          if (getDirection(waypoints[i+1], waypoints[i]) != getDirection(waypoints[i], waypoints[i-1])) {
+          if (getDirection(waypoints[i], waypoints[i+1]) != getDirection(waypoints[i-1], waypoints[i])) {
             linePath.push(waypoints[i])
             linePathLength += getDistanceBetween(linePath[linePath.length-1], linePath[linePath.length-2])
           }
@@ -406,7 +456,7 @@
         linePathLength += getDistanceBetween(linePath[linePath.length-1], linePath[linePath.length-2])
       }
 
-      function getDirection(pathpoint1, pathpoint0) {
+      function getDirection(pathpoint0, pathpoint1) {
         return Math.atan2( pathpoint1.y - pathpoint0.y, pathpoint1.x - pathpoint0.x )
       }
 
@@ -461,7 +511,7 @@
         }
 
         this.velocity = 300
-        this.direction = getDirection(target.coords, getCenter(tower))
+        this.direction = getDirection(getCenter(tower), target.coords)
         this.size = 2
         this.damage = tower.damage
 

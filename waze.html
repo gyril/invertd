@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+  <head>
+    <title>Invertd</title>
+    <style type="text/css">
+    #canvas, #sprites {
+      position: absolute;
+      top: 50px;
+      left: 50px;
+      box-shadow: 0 0 0 1px black;
+    }
+
+    #sprites {
+      pointer-events: none;
+    }
+
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas">
+    </canvas>
+    <canvas id="sprites">
+    </canvas>
+
+    <script type="text/javascript">
+      var canvas = document.getElementById('canvas')
+        , sprites = document.getElementById('sprites')
+        , canvasContext = canvas.getContext('2d')
+        , spritesContext = sprites.getContext('2d')
+        , width = 400
+        , height = 400
+        , _tick
+
+      canvas.width = width
+      canvas.height = height
+      canvas.style.width = width + 'px'
+      canvas.style.height = height + 'px'
+      sprites.width = width
+      sprites.height = height
+      sprites.style.width = width + 'px'
+      sprites.style.height = height + 'px'
+      
+      var start = {
+          x: 0,
+          y: height/2
+        }
+        , end = {
+          x: width,
+          y: height/2
+        }
+        , units = []
+        , polygons = []
+
+      function init () {
+        window.clearTimeout(_tick)
+
+        drawPolygons()
+        units = [new Unit(start, end)]
+
+        tick(new Date())
+      }
+
+      function tick (lastDate) {
+        var now = new Date()
+          , delta = new Date(now - lastDate).getTime() / 1000
+
+        updateUnits(delta)
+
+        _tick = window.setTimeout( function() {
+          tick(now)
+        }, 1000/60)
+      }
+
+      function updateUnits (delta) {
+        for (var i = 0; i < units.length; i++) {
+          var unit = units[i]
+          unit.x += Math.cos(unit.direction) * unit.velocity * delta
+          unit.y += Math.sin(unit.direction) * unit.velocity * delta
+        }
+
+        drawUnits()
+      }
+
+      function drawUnits () {
+        spritesContext.clearRect(0, 0, sprites.width, sprites.height)
+
+        for (var i = units.length - 1; i >= 0; i--) {
+          var unit = units[i]
+          spritesContext.beginPath()
+          spritesContext.arc(unit.x, unit.y, unit.size, 0, 2 * Math.PI, false)
+          spritesContext.fillStyle = unit.color
+          spritesContext.fill()
+        }
+      }
+
+      function drawPolygons () {
+        canvasContext.clearRect(0, 0, canvas.width, canvas.height)
+
+        for (var i = polygons.length - 1; i >= 0; i--) {
+          var polygon = polygons[i]
+          canvasContext.beginPath()
+          canvasContext.moveTo(polygon.nodes[0].x, polygon.nodes[0].y)
+          for (var j = 0; j < polygon.nodes.length; j++)
+            canvasContext.lineTo(polygon.nodes[j].x, polygon.nodes[j].y)
+
+          canvasContext.closePath()
+          canvasContext.fillStyle = polygon.color
+          canvasContext.fill()
+        };
+      }
+
+      function Unit (spawnPoint, targetPoint) {
+        this.x = spawnPoint.x
+        this.y = spawnPoint.y
+        this.size = width/100
+        this.velocity = width/10
+        this.direction = getDirection(spawnPoint, targetPoint)
+        this.color = 'steelblue'
+      }
+
+      function getDirection (point0, point1) {
+        return Math.atan2( point1.y - point0.y, point1.x - point0.x )
+      }
+
+      function Polygon (nodes) {
+        this.nodes = nodes
+        this.color = 'orange'
+      }
+
+    </script>
+  </body>
+</html>
