@@ -4,296 +4,792 @@
   <head>
     <title>Invertd</title>
     <style type="text/css">
-    #canvas {
-      border-top: 1px solid black;
-      border-left: 1px solid black;
-      border-bottom: 2px solid black;
-      border-right: 2px solid black;
-      width: 525px;
-      height: 525px;
-      margin: 50px auto;
+    #container {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      margin: 0 auto;
     }
 
-    .cell {
-      width: 25px;
-      height: 25px;
-      float: left;
-      border-top: 1px solid black;
-      border-left: 1px solid black;
-      box-sizing: border-box;
+    #panel {
+      position: fixed;
+      top: 50px;
+      left: 120px;
     }
 
-    .tower {
-      background-color: red
+    #leaderboard {
+      position: fixed;
+      top: 50px;
+      right: 120px;
     }
 
-    .road {
-      background-color: yellow
+    button {
+      color: white;
+      background: hsl(200, 50% , 50%);
+      border: 2px solid white;
+      padding: 10px 20px;
+      cursor: pointer;
+      outline: none;
+      box-shadow: 0 0 0px 1px black, 0 0 0px 1px rgb(100, 100, 100) inset;
     }
 
-    #units {
+    #canvas, #sprites {
       position: absolute;
-      width: 525px;
-      height: 525px;
+      top: 0px;
+      left: 0px;
+    }
+
+    #sprites {
       pointer-events: none;
     }
-
-    .kryl {
-      position: absolute;
-      width: 5px;
-      height: 5px;
-      border-radius: 5px;
-      background-color: purple;
-    }
-
-    .krei {
-      position: absolute;
-      width: 5px;
-      height: 5px;
-      border-radius: 5px;
-      background-color: black;
-    }
     </style>
+    <script id="worker" type="javascript/worker">
+      // This script won't be parsed by JS engines because its type is javascript/worker.
+      var _tick
+
+      self.onmessage = function(e) {
+        if (e.data.func == 'stop') {
+          self.clearTimeout(_tick)
+          return
+        }
+
+        _tick = self.setTimeout(function() {
+          self.postMessage({func: e.data.func, arg: e.data.arg})
+        }, e.data.interval)
+      }
+    </script>
+    <script type="text/javascript">
+      // seedrandom.js
+      !function(a,b,c,d,e,f,g,h,i){function j(a){var b,c=a.length,e=this,f=0,g=e.i=e.j=0,h=e.S=[];for(c||(a=[c++]);d>f;)h[f]=f++;for(f=0;d>f;f++)h[f]=h[g=r&g+a[f%c]+(b=h[f])],h[g]=b;(e.g=function(a){for(var b,c=0,f=e.i,g=e.j,h=e.S;a--;)b=h[f=r&f+1],c=c*d+h[r&(h[f]=h[g=r&g+b])+(h[g]=b)];return e.i=f,e.j=g,c})(d)}function k(a,b){var c,d=[],e=typeof a;if(b&&"object"==e)for(c in a)try{d.push(k(a[c],b-1))}catch(f){}return d.length?d:"string"==e?a:a+"\0"}function l(a,b){for(var c,d=a+"",e=0;e<d.length;)b[r&e]=r&(c^=19*b[r&e])+d.charCodeAt(e++);return n(b)}function m(c){try{return a.crypto.getRandomValues(c=new Uint8Array(d)),n(c)}catch(e){return[+new Date,a,(c=a.navigator)&&c.plugins,a.screen,n(b)]}}function n(a){return String.fromCharCode.apply(0,a)}var o=c.pow(d,e),p=c.pow(2,f),q=2*p,r=d-1,s=c["seed"+i]=function(a,f,g){var h=[];f=1==f?{entropy:!0}:f||{};var r=l(k(f.entropy?[a,n(b)]:null==a?m():a,3),h),s=new j(h);return l(n(s.S),b),(f.pass||g||function(a,b,d){return d?(c[i]=a,b):a})(function(){for(var a=s.g(e),b=o,c=0;p>a;)a=(a+c)*d,b*=d,c=s.g(1);for(;a>=q;)a/=2,b/=2,c>>>=1;return(a+c)/b},r,"global"in f?f.global:this==c)};l(c[i](),b),g&&g.exports?g.exports=s:h&&h.amd&&h(function(){return s})}(this,[],Math,256,6,52,"object"==typeof module&&module,"function"==typeof define&&define,"random")
+
+      
+      var storedHash = window.location.hash.substr(1)
+
+      window.setInterval(function() {
+        if (window.location.hash.substr(1) != storedHash) {
+          storedHash = window.location.hash.substr(1)
+          init()
+        }
+      }, 200)
+
+      var env = window.location.href.indexOf('invertd.') > -1 ? 'prod' : 'dev'
+        , domain = env == 'prod' ? 'http://invertd.airhost.me' : 'http://localhost:1337/invertd'
+        , APIdomain = env == 'prod' ? 'http://invertd.herokuapp.com' : 'http://localhost:5000'
+
+    </script>
   </head>
   <body>
-    <button id="road" onclick="toggleroad()">validate road</button><button id="start" onclick="tick()">go</button><br>
-    army (0 = kryl, 1 = krei; separate with ,) <input type="text" id="army" /> <button onclick="validatearmy()">validate army</button>
-    <div id="budget"></div>
+    <div id="container">
+      <canvas id="board">
+      </canvas>
+      <canvas id="canvas">
+      </canvas>
+      <canvas id="sprites">
+      </canvas>
 
-    <div id="canvas">
-      <div id="units"></div>
+      <div id="panel">
+        Time left to build: <span id="tltb"></span><br>
+        Time in maze: <span id="tim">0.00</span><br>
+        Your best today: <span id="best">0.00</span><br>
+        New maze in: <span id="next">-</span><br>
+        <button onclick="clearWalls()">CLEAR (C)</button>
+        <button onclick="start()">START (S)</button>
+      </div>
+
+      <div id="leaderboard">
+        Best scores today (#<span id="maze"></span>)<br>
+        <ol>
+          <li></li>
+          <li></li>
+          <li></li>
+          <li></li>
+          <li></li>
+        </ol>
+      </div>
     </div>
 
-    
-
     <script type="text/javascript">
-      var canvas = document.getElementById('canvas')
-        , roadbuilding = true
-        , budget = 4000
-        , towers = [
-          new Tower(8, 3),
-          new Tower(8, 11),
-          new Tower(12, 9),
-          new Tower(12, 17)
-        ]
-        , start = [10, 0]
-        , end = [10, 20]
-        , road = [[10,0],[10,1],[10,2],[10,3],[10,4],[10,5],[10,6],[10,7],[10,8],[10,9],[10,10],[10,11],[10,12],[10,13],[10,14],[10,15],[10,16],[10,17],[10,18],[10,19],[10,20]]
-        , path = []
-        , cells = []
-        , units = []
-        , tickID
-    
+      var blob = new Blob([
+          document.querySelector('#worker').textContent
+        ], { type: "text/javascript" })
 
+      var worker = new Worker(window.URL.createObjectURL(blob))
+      worker.onmessage = function(e) {
+        window[e.data.func](e.data.arg)
+      }
+
+      var board = document.getElementById('board')
+        , canvas = document.getElementById('canvas')
+        , sprites = document.getElementById('sprites')
+        , boardContext = board.getContext('2d')
+        , canvasContext = canvas.getContext('2d')
+        , spritesContext = sprites.getContext('2d')
+        
+      var hexRadius = 32
+        , grid
+        , boardRadius = 6
+        , boardHeight = (hexRadius * 2) + 3/4 * (hexRadius * 2) * (boardRadius * 2)
+        , boardWidth = Math.sqrt(3) * hexRadius * (boardRadius * 2 + 1)
+        , buildTime = 30000
+        , cancelCountdown = false
+        , started = false
+        , score
+        , best = 0
+        , player = null
+        , walls
+        , specials
+        , effects = []
+        , mobile
+
+      document.getElementById('container').style.width = Math.round(boardWidth) + 'px'
+      board.height = boardHeight
+      board.width = boardWidth
+      canvas.height = boardHeight
+      canvas.width = boardWidth
+      sprites.height = boardHeight
+      sprites.width = boardWidth
+
+      document.getElementById('maze').textContent = window.location.hash.substr(1)
+      document.addEventListener('keyup', function (e) {
+        if (e.keyCode == 67)
+          clearWalls()
+        if (e.keyCode == 83)
+          start()
+      }, false)
+
+      canvas.addEventListener('click', click, false)
+      
       function init () {
-        updateBudget()
+        started = false
 
-        for (var i = 0; i < 21; i++) {
-          cells[i] = []
-          for (var j = 0; j < 21; j++) {
-            var cell = document.createElement('div')
-            cell.className = 'cell'
-            cell.dataset.x = i
-            cell.dataset.y = j
-            //cell.addEventListener('mouseenter', enterCell, false)
-            cells[i][j] = cell
-            canvas.appendChild(cell)
-          }
+        Math.seedrandom(storedHash)
+        canvas.removeEventListener('click', click, false)
+        canvas.addEventListener('click', click, false)
+      
+        specials = []
+        grid = []
+
+        for (var i = 0; i < (boardRadius * 2 + 1); i++) {
+          grid[i] = []
+          for (var j = 0; j < boardRadius * 2 - Math.abs(i - boardRadius) + 1; j++)
+            grid[i].push(new Hex(qVecFromCoord(i, j), rVecFromCoord(i, j)))
         }
 
-        var startCell = cells[start[0]][start[1]]
-        startCell.className += ' road start'
-        path.push(startCell)
+        specials.push(grid[boardRadius][0], grid[boardRadius][boardRadius*2])
+        drawCells()
+
+        cancelCountdown = true
+        mobile = null
+        walls = []
+
+        window.setTimeout(function() {
+          cancelCountdown = false
+          generateRandomWalls(30, 3)
+          tickCountdown(buildTime)
+          new Mobile(specials[0])
+        }, 100)
+      }
+
+      function random () {
+        Math.seedrandom(new Date())
+        window.location.hash = Math.random().toString(36).substr(2, 8)
+      }
+
+      function tickCountdown (countdown) {
+        if (cancelCountdown)
+          return
+
+        if (countdown <= 0) {
+          start(new Date())
+          displayCountdown(0)
+          return
+        }
+
+        displayCountdown(Math.floor(countdown/1000))
+        worker.postMessage({func: 'tickCountdown', arg: countdown-100, interval: 100})
+      }
+
+      function displayCountdown (countdown) {
+        document.getElementById('tltb').textContent = countdown
+        updateNewMazeIn()
+      }
+
+      function start () {
+        if (started)
+          return
+
+        started = true
+        canvas.removeEventListener('click', click, false)
+        mobile.path = bellman(specials[0], specials[1])
+        mobile.step = 0
+        mobile.direction = getDirection(mobile.path[mobile.step], mobile.path[mobile.step+1])
+        score = 0
+        cancelCountdown = true
+
+        window.setTimeout(function() {
+          cancelCountdown = false
+          tick(new Date())
+        }, 110)
+      }
+
+      function clearWalls () {
+        started = false
+        canvas.addEventListener('click', click, false)
+        mobile.remove()
+        cancelCountdown = true
         
-        var endCell = cells[end[0]][end[1]]
-        endCell.className += ' road end'
-        path.push(endCell)
+        for (var i = walls.length - 1; i >= 0; i--) {
+          if (walls[i].removable)
+            walls[i].remove()
+        }
+
+        window.setTimeout(function() {
+          cancelCountdown = false
+          new Mobile(specials[0])
+          tickCountdown(buildTime)
+        }, 110)
+      }
+
+      function qVecFromCoord (i, j) {
+        return Math.max(j - i, j - boardRadius)
+      }
+
+      function rVecFromCoord (i, j) {
+        return (i - boardRadius)
+      }
+
+      function rowFromVector (q, r) {
+        return r + boardRadius
+      }
+
+      function hexFromVector(q, r) {
+        var i = rowFromVector(q, r)
+          , j = columnFromVector(q, r)
+        if (typeof grid[i] == 'undefined' || typeof grid[i][j] == 'undefined')
+          return null
+
+        return grid[i][j]
+      }
+
+      function columnFromVector (q, r) {
+        return (r > 0) ? q + boardRadius : q + (r + boardRadius)
+      }
+
+      function click (e) {
+        var x = e.offsetX || e.layerX
+          , y = e.offsetY || e.layerY
+          , hex = getHexFromPixel(x, y)
+
+        if (hex == null)
+          return
+
+        hexClicked(hex)
+      }
+
+      function hexClicked (hex) {
+        if (specials.indexOf(hex) > -1)
+          return
+
+        if (hex.constructor.name == 'Wall' || hex.constructor.name == 'Tower') {
+          if (!hex.removable)
+            return
+
+          hex.remove()
+        } else {
+          new Wall(rowFromVector(hex.q, hex.r), columnFromVector(hex.q, hex.r), true)
+        }
+      }
+
+      // FIXME: doesn't work well around edges
+      function getHexFromPixel (x, y) {
+        var offsetX = boardWidth / 2
+          , offsetY = boardHeight / 2
+          , qFrac = (1/3*Math.sqrt(3) * (x - offsetX) - 1/3 * (y - offsetY)) / (hexRadius)
+          , rFrac = 2/3 * (y - offsetY) / (hexRadius)
+          , q = Math.round(qFrac)
+          , r = Math.round(rFrac)
+
+        var hex = grid[rowFromVector(q, r)][columnFromVector(q, r)]
+
+        if (typeof hex == 'undefined')
+          return null
+
+        return hex
+      }
+
+      function drawCells () {
+        boardContext.clearRect(0, 0, canvas.width, canvas.height)
+
+        for (var i = 0; i < grid.length; i++)
+          for (var j = 0; j < grid[i].length; j++)
+            drawHexagon(boardContext, getPixelCenter(grid[i][j]), hexRadius)
+    
+        for (var i = 0; i < specials.length; i++) {
+          drawHexagon(boardContext, getPixelCenter(specials[i]), hexRadius, 'hsl(200, 40%, 50%)')
+        }
+
+      }
+
+      function drawWalls () {
+        canvasContext.clearRect(0, 0, canvas.width, canvas.height)
+
+        for (var i = 0; i < walls.length; i++) {
+          var wall = walls[i]
+          drawHexagon(canvasContext, getPixelCenter(wall), wall.size, wall.color)
+        }
+      }
+
+      function drawHexagon (context, center, radius, fill) {
+        var x = center.x
+          , y = center.y
+          , h = radius
+          , w = Math.sqrt(3) * h / 2
+          , fillStyle = (typeof fill == 'undefined') ? 'transparent' : fill
+
+        context.beginPath()
+        context.moveTo(x, y + h)
+        context.lineTo(x - w, y + h/2)
+        context.lineTo(x - w, y - h/2)
+        context.lineTo(x, y - h)
+        context.lineTo(x + w, y - h/2)
+        context.lineTo(x + w, y + h/2)
+        context.closePath()
+        context.stroke()
+        context.fillStyle = fillStyle
+        context.fill()
+      }
+
+      function drawSprites () {
+        spritesContext.clearRect(0, 0, sprites.width, sprites.height)
+
+        spritesContext.beginPath()
+        spritesContext.arc(mobile.x, mobile.y, mobile.size, 0, 2 * Math.PI, false)
+        spritesContext.fillStyle = 'hsl('+mobile.hue+', '+mobile.sat * 100+'%, '+mobile.light * 100+'%)'
+        spritesContext.fill()
+
+        for (var i = 0; i < effects.length; i++) {
+          var effect = effects[i]
+          
+          spritesContext.beginPath()
+          spritesContext.arc(effect.x, effect.y, effect.size, 0, 2 * Math.PI, false)
+          spritesContext.fillStyle = effect.color
+          spritesContext.save()
+          spritesContext.globalAlpha = effect.alpha
+          spritesContext.fill()
+          spritesContext.restore()
+        }
+      }
+
+      function tick (lastDate) {
+        if (mobile == null || mobile.won)
+          return
+
+        var now = new Date()
+          , delta = new Date(now - lastDate).getTime()
         
-        for (var i = 0; i < road.length; i++) {
-          cells[road[i][0]][road[i][1]].className += ' road'
-        }
+        updateMobile(delta)
+        updateEffects(now)
+        fireTowers(now)
+        updateChrono(delta)
 
-        for (var i = 0; i < towers.length; i++) {
-          makeTower(towers[i].x, towers[i].y)
-        }
+        drawSprites()
 
+        worker.postMessage({func: 'tick', arg: now, interval: 1000/60})
       }
 
-      function tick() {
-        for (var i = 0; i < towers.length; i++) {
-          towers[i].hasfired = false
-        }
+      function updateMobile (delta) {
+        var nx = mobile.x + Math.cos(mobile.direction) * mobile.velocity * delta / 1000
+          , ny = mobile.y + Math.sin(mobile.direction) * mobile.velocity * delta / 1000
+          , targetPixel = getPixelCenter(mobile.path[mobile.step+1])
 
-        for (var i = 0; i < units.length; i++) {
-          var unit = units[i]
-          if (!unit.dead) {
-            updateHP(unit)
-            unit.position++
-            if (unit.position > road.length && !unit.dead)
-              unit.win()
-          }
-        }
-
-        draw()
-        tickID = window.setTimeout(tick, 500)
-      }
-
-      function draw () {
-        for (var i = 0; i < units.length; i++) {
-          if (units[i].position > -1 && units[i].position < road.length) {
-            units[i].el.style.top = road[units[i].position][0] * 25 + 10
-            units[i].el.style.left = road[units[i].position][1] * 25 + 10
-            units[i].el.textContent = units[i].hp
-          } else if (units[i].position >= road.length) {
-            units[i].el.style.visibility = 'hidden'
-          }
-        }
-      }
-
-      function makeTower (x, y) {
-        cells[x][y].className += ' tower'
-      }
-
-      function updateHP (unit) {
-
-        for (var i = 0; i < towers.length; i++) {
-          if (unit.position > 0 && unit.position < road.length && Math.abs(road[unit.position][0] - towers[i].x) < 3 && Math.abs(road[unit.position][1] - towers[i].y) < 3 && !towers[i].hasfired) {
-            unit.hp -= 10
-            towers[i].hasfired = true
-          }
-        }
-
-        if (unit.hp <= 0) {
-          unit.die()
-        }
-      }
-
-      function Unit (order) {
-        this.position = (-1 * order * 2) - 1
-        this.dead = false
-        
-        this.el = document.createElement('div')
-        document.getElementById('units').appendChild(this.el)
-
-        this.die = function () {
-          document.getElementById('units').removeChild(this.el)
-          this.dead = true
-        }
-
-        this.win = function() {
-          console.log(this, 'wins')
-          this.die()
-        }
-      }
-
-      function Kryl (order) {
-        Unit.apply(this, arguments)
-
-        this.hp = 25
-        this.cost = 200
-
-        this.el.className = 'kryl'
-      }
-
-      function Krei (order) {
-        Unit.apply(this, arguments)
-
-        this.hp = 50
-        this.cost = 300
-
-        this.el.className = 'krei'
-      }
-
-      function Tower (x, y) {
-        this.x = x
-        this.y = y
-
-        this.damage = 10
-
-        this.hasfired = false
-      }
-
-      init()
-
-
-      function toggleroad () {
-        roadbuilding = !roadbuilding
-        document.getElementById('road').textContent = roadbuilding ? 'validate road' : 'edit road'
-        if (!roadbuilding)
-          checkroad()
-      }
-
-      function checkroad () {
-        var arr = path.map(function(el) {return [parseInt(el.dataset.x), parseInt(el.dataset.y)]})
-
-        var ordArr = []
-
-        for (var i=1; i < arr.length; i++) {
-          var arr0 = arr[i]
-            , k = -1
-          for (var j=i; j<arr.length; j++) {
-            if(Math.abs(arr[i-1][0] - arr[j][0]) + Math.abs(arr[i-1][1] - arr[j][1]) == 1)
-              k = j
-          }
-
-          if (k < 0) {
-            alert('route non continue')
+        if ((nx - targetPixel.x) * (targetPixel.x - mobile.x) > 0 || (ny - targetPixel.y) * (targetPixel.y - mobile.y) > 0) {
+          mobile.step++
+          if (mobile.step + 1 >= mobile.path.length) {
+            mobile.win()
             return
           }
 
-          arr[i] = arr[k]
-          arr[k] = arr0
+          mobile.direction = getDirection(mobile.path[mobile.step], mobile.path[mobile.step+1])
+
+          mobile.x = targetPixel.x + Math.cos(mobile.direction) * Math.sqrt(Math.pow(nx - targetPixel.x, 2) + Math.pow(ny - targetPixel.y, 2))
+          mobile.y = targetPixel.y + Math.sin(mobile.direction) * Math.sqrt(Math.pow(nx - targetPixel.x, 2) + Math.pow(ny - targetPixel.y, 2))
+        } else {
+          mobile.x = nx
+          mobile.y = ny
         }
-
-        road = arr
       }
 
-      function enterCell () {
-        if (roadbuilding)
-          toggleCell(this)
+      function updateEffects (now) {
+        for (var i = effects.length - 1; i >= 0; i--) {
+          var effect = effects[i]
+
+          if (now - effect.started > effect.duration)
+            effect.remove()
+          else {
+            effect.alpha = Easings[effect.easeout](1 - (now - effect.started) / effect.duration)
+          }
+        }
       }
 
-      function toggleCell (cell) {
-        if(cell.className.indexOf('tower') > -1 || cell.className.indexOf('start') > -1 || cell.className.indexOf('end') > -1)
+      function fireTowers (now) {
+        for (var i = 0; i < walls.length; i++) {
+          var tower = walls[i]
+
+          // Can break out of the loop because towers are at the beginning of `towers` Array
+          if (tower.constructor.name != 'Tower')
+            break
+
+          if (tower.lastFired + tower.reloadTime <= now.getTime()) {
+            if (getDistanceBetween(mobile, getPixelCenter(tower)) < tower.range && tower.lastFired != now.getTime()) {
+              tower.lastFired = now.getTime()
+              tower.fire(mobile)
+            }
+          }
+        }
+      }
+
+      function updateChrono (delta) {
+        if (mobile.won)
           return
 
-        if(cell.className.indexOf('road') > -1) {
-          budget += 100
-          cell.className = cell.className.replace( / road/ , '' )
-          path.splice(path.indexOf(cell), 1)
-        } else {
-          if (budget >= 100) {
-            budget -= 100
-            cell.className += ' road'
-            path.push(cell)
+        score += (delta / 1000)
+        document.getElementById('tim').textContent = parseFloat(Math.round(score * 100) / 100).toFixed(2)
+        
+        if (score > best) {
+          best = score
+          document.getElementById('best').textContent = parseFloat(Math.round(score * 100) / 100).toFixed(2)
+        }
+
+        updateNewMazeIn()
+      }
+
+      function updateNewMazeIn () {
+        // demain = date de changement sur le fuseau UTC ; delta = diff entre demain et le now UTC en ms
+        var demain = new Date(new Date().setHours(0,0,0,0) + 1000*60*60*24)
+          , delta = demain - new Date(new Date().getTime() + new Date().getTimezoneOffset() * 60000)
+          , time = new Date(new Date(0).setHours(0,0,0,0) + delta)
+
+        document.getElementById('next').textContent = (time.getHours()<10?'0':'') + time.getHours() + ':' + (time.getMinutes()<10?'0':'') + time.getMinutes() + ':' + (time.getSeconds()<10?'0':'') + time.getSeconds()
+      }
+
+      function getPixelCenter (Hex) {
+        var offsetX = boardWidth / 2
+          , offsetY = boardHeight / 2
+          , q = Hex.q
+          , r = Hex.r
+          , x = hexRadius * Math.sqrt(3) * (q + r/2) + offsetX
+          , y = hexRadius * 3/2 * r + offsetY
+
+        return {
+          x: x,
+          y: y
+        }
+      }
+
+      function generateRandomWalls (qty, towers) {
+        var arr = []
+
+        for (var i = 0; i < grid.length; i++)
+          for (var j = 0; j < grid[i].length; j++) {
+            if (specials.indexOf(grid[i][j]) == -1)
+              arr.push([i, j])
+          }
+
+        arr = shuffle(arr)
+
+        for (var i = 0; i < qty; i++) {
+          if (i < towers) {
+            new Tower(arr[i][0], arr[i][1], false)
+          } else {
+            new Wall(arr[i][0], arr[i][1], false)
+          }
+        }
+      }
+
+      function Hex (q, r) {
+        this.q = q
+        this.r = r
+      }
+
+      function Wall (i, j, removable) {
+        var q = qVecFromCoord(i, j)
+          , r = rVecFromCoord(i, j)
+
+        Hex.apply(this, [q, r])
+
+        this.removable = removable
+        this.size = hexRadius - 4
+        this.color = removable ? 'hsl(60, 40%, 60%)' : 'hsl(140, 40%, 60%)'
+
+        this.init = function () {
+          grid[i][j] = this
+          walls.push(this)
+          drawWalls()
+
+          if (!bellman(specials[0], specials[1]))
+            this.remove()
+        }
+
+        this.remove = function () {
+          grid[i][j] = new Hex (this.q, this.r)
+          walls.splice(walls.indexOf(this), 1)
+          drawWalls()
+        }
+
+        this.init()
+      }
+
+      function Tower (i, j, removable) {
+        Wall.apply(this, arguments)
+
+        this.color = 'hsl(360, 40%, 60%)'
+
+        this.range = 100
+        this.reloadTime = 2200
+        this.lastFired = 0
+
+        this.crippleFactor = .5
+        this.crippleDuration = 1800
+
+        this.won = false
+
+        this.fire = function (target) {
+          effects.push(new Effect({
+            type: 'circle',
+            color: this.color,
+            easeout: 'easeInCubic',
+            center: getPixelCenter(this),
+            size: this.range,
+            duration: this.reloadTime
+          }))
+
+          target.cripple(this.crippleFactor, this.crippleDuration)
+        }
+      }
+
+      function Mobile (spawnHex) {
+        this.x = getPixelCenter(spawnHex).x
+        this.y = getPixelCenter(spawnHex).y
+        this.size = 12
+        this.hue = 200
+        this.sat = .7
+        this.light = .3
+        this.velocity = 200
+        this.direction = null
+        this.step = null
+        this.path = bellman(specials[0], specials[1])
+
+        this.init = function () {
+          mobile = this
+
+          this.step = 0
+          this.direction = getDirection(this.path[this.step], this.path[this.step+1])
+
+          drawSprites()
+        }
+
+        this.cripple = function (factor, duration) {
+          this.velocity *= factor
+          _this = this
+          window.setTimeout(function() {
+            _this.velocity /= factor
+          }, duration)
+        }
+
+        this.win = function () {
+          submitScore()
+          this.won = true
+        }
+
+        this.remove = function () {
+          mobile = null
+        }
+
+        this.init()
+      }
+
+      function Effect (effect) {
+        this.type = effect.type
+        this.color = effect.color
+        this.easeout = effect.easeout
+        this.x = effect.center.x
+        this.y = effect.center.y
+        this.size = effect.size
+        this.duration = effect.duration
+        this.started = new Date()
+        this.alpha = 1
+
+        this.remove = function () {
+          effects.splice(effects.indexOf(this), 1)
+        }
+      }
+
+      function getDirection (hex0, hex1) {
+        var pix0 = getPixelCenter(hex0)
+          , pix1 = getPixelCenter(hex1)
+
+        return Math.atan2( pix1.y - pix0.y, pix1.x - pix0.x )
+      }
+
+      function getDistanceBetween (pix0, pix1) {
+        return Math.sqrt(Math.pow(pix1.x - pix0.x, 2) + Math.pow(pix1.y - pix0.y, 2))
+      }
+
+      function shuffle (o) {
+        for(var j, x, i = o.length; i; j = Math.floor(Math.random() * i), x = o[--i], o[i] = o[j], o[j] = x);
+        return o
+      }
+
+      function bellman (start, goal) {
+        var node = start
+          , visited = [start]
+          , totalCost = {}
+          , previous = {}
+          , frontier = [[start]]
+          , neighbors = [
+             [+1,  0], [+1, -1], [ 0, -1],
+             [-1,  0], [-1, +1], [ 0, +1]
+            ]
+
+        totalCost[start.q.toString()+','+start.r.toString()] = 0
+        previous[start.q.toString()+','+start.r.toString()] = null
+          
+        for (var l = 0; l<100 && frontier[l].length > 0; l++) {
+          frontier[l+1] = []
+          
+          for (var m = 0; m < frontier[l].length; m++) {
+            node = frontier[l][m]
+
+            for (var k = 0; k < 6; k++) {
+              var d = neighbors[k]
+                , qq = node.q + d[0]
+                , rr = node.r + d[1]
+                , neighbor = hexFromVector(qq, rr)
+
+              if (neighbor != null && neighbor.constructor.name == 'Hex' && visited.indexOf(neighbor) == -1) {
+                frontier[l+1].push(neighbor)
+                visited.push(neighbor)
+                totalCost[neighbor.q.toString()+','+neighbor.r.toString()] = l+1
+                previous[neighbor.q.toString()+','+neighbor.r.toString()] = node
+              }
+            }
           }
         }
 
-        updateBudget()
-      }
+        var pathNode = goal
+          , path = [pathNode]
 
-      function validatearmy () {
-        for (var i=0; i < units.length; i++) {
-          budget += units[i].cost
+        if (typeof previous[pathNode.q.toString()+','+pathNode.r.toString()] == 'undefined')
+          return false
+
+        while(pathNode != start) {
+          pathNode = previous[pathNode.q.toString()+','+pathNode.r.toString()]
+          path.push(pathNode)
         }
 
-        units = []
+        return path.reverse()
+      }
 
-        var army = eval('['+document.getElementById('army').value+']')
+      Easings = {
+        'easeInCubic': function (x) {
+          return Math.pow(x, 3)
+        }
+      }
+
+      function revealPath() {
+        drawCells()
+        var path = bellman(specials[0], specials[1])
+
+        for (var i = 0; i < path.length; i++) {
+          drawHexagon(boardContext, getPixelCenter(path[i]), 16, 'steelblue')
+        }
+      }
+
+      if (storedHash.length == 0)
+        daily()
+      else init()
+
+      getDailyLeaderboard()
+
+      // API functions
+      function getDailyLeaderboard () {
+        var xhr = new XMLHttpRequest()
+        xhr.open('GET', APIdomain + '/best/today', true)
+        xhr.onload = function(e) {
+          if (this.status == 200) {
+            var data = JSON.parse(this.responseText)
+            displayLeaderboard(data)
+          }
+        }
+        xhr.send()
+      }
+
+      function displayLeaderboard (data) {
+        var ldb = document.getElementById('leaderboard')
+          , list = ldb.getElementsByTagName('li')
         
-        for (var i=0; i < army.length; i++) {
-          var unit = (army[i] == 0) ? new Kryl(i) : new Krei(i)
-          units.push(unit)
-          budget -= unit.cost
+        for (var i = 0; i < data.length; i++) {
+          var score = data[i]
+
+          list[i].textContent = score.player + ' - ' + score.score
+        }
+      }
+
+      function getLeaderboard (maze, limit) {
+        var xhr = new XMLHttpRequest()
+        xhr.open('GET', APIdomain + '/best/'+maze+'/'+limit, true)
+        xhr.onload = function(e) {
+          if (this.status == 200) {
+            var data = JSON.parse(this.responseText)
+            displayLeaderboard(data)
+          }
+        }
+        xhr.send()
+      }
+
+      function daily () {
+        var xhr = new XMLHttpRequest()
+        xhr.open('GET', APIdomain + '/currentmaze', true)
+        xhr.onload = function(e) {
+          if (this.status == 200) {
+            var maze = this.responseText
+            window.location.hash = maze
+          }
+        }
+        xhr.send()
+      }
+
+      function submitScore () {
+        if (player == null)
+          player = window.prompt('Choose a nickname to submit your score (defaults to "anon")')
+
+        if (player == null)
+          player = 'anon'
+
+        var data = new FormData()
+        data.append('player', '6ou')
+        data.append('score', score)
+        data.append('maze', window.location.hash.substr(1))
+
+        var dutu = {
+          maze: window.location.hash.substr(1),
+          score: score,
+          player: player
         }
 
-        updateBudget()
+        var xhr = new XMLHttpRequest()
+        xhr.open('POST', APIdomain + '/record', true)
+        xhr.setRequestHeader('Content-Type', 'application/json;charset=UTF-8')
+        xhr.onload = function(e) {
+          if (this.status == 200) {
+            getDailyLeaderboard()
+          }
+        }
+        xhr.send(JSON.stringify(dutu))
       }
-
-      function updateBudget () {
-        document.getElementById('budget').textContent = 'Flouze : ' + budget
-      }
-
     </script>
+
   </body>
 </html>
